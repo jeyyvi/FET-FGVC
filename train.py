@@ -1,7 +1,7 @@
 # -*- "coding: utf-8" -*-
 # At the very top of train.py, **before** importing pyplot
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend for scripts - CAPITAL 'A'!
+matplotlib.use('agg')  # Use non-interactive backend for scripts - CAPITAL 'A'!
 
 from datetime import datetime
 import math
