@@ -1,4 +1,7 @@
 # -*- "coding: utf-8" -*-
+# At the very top of train.py, **before** importing pyplot
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for scripts
 
 from datetime import datetime
 import math
@@ -12,10 +15,8 @@ from omegaconf import OmegaConf
 import numpy as np
 # import matplotlib
 # matplotlib.use("agg")
-# At the very top of train.py, **before** importing pyplot
-import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend for scripts
-from matplotlib import pyplot as plt
+
+
 
 
 import torch
