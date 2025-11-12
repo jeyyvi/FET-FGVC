@@ -10,8 +10,13 @@ import argparse
 from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 import numpy as np
+# import matplotlib
+# matplotlib.use("agg")
+# At the very top of train.py, **before** importing pyplot
 import matplotlib
-matplotlib.use("agg")
+matplotlib.use('Agg')  # Use non-interactive backend for scripts
+from matplotlib import pyplot as plt
+
 
 import torch
 import torch.nn as nn
