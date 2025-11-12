@@ -1,7 +1,10 @@
 # -*- "coding: utf-8" -*-
-# At the very top of train.py, **before** importing pyplot
+# At the very top of train.py, **before** importing matplotlib
+import os
+os.environ.pop('MPLBACKEND', None)  # Remove the problematic env variable
+
 import matplotlib
-matplotlib.use('agg')  # Use non-interactive backend for scripts - CAPITAL 'A'!
+matplotlib.use('Agg')  # Use non-interactive backend for scripts
 
 from datetime import datetime
 import math
