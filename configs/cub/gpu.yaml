@@ -1,13 +1,14 @@
 parent: ./configs/cub/base.yaml
 
 dataset:
-  root_dir: ~/workspace/dataset/CUB_200_2011/
+  root_dir: "/content/FET-FGVC/CUB_200_2011/"
+  txt_dir: "./datasets/CUB_200_2011/"
 
 backbone:
-  pretrain_root: "/root/workspace/pretrained/vit/"
+  pretrain_root: "/content/FET-FGVC/pretrained/"
 
 train:
-  num_workers: 4
+  num_workers: 2
 
 val:
-  num_workers: 4
+  num_workers: 2
