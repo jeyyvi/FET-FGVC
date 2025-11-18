@@ -11,4 +11,5 @@ train:
   num_workers: 2
 
 val:
+  stage: val # ← REQUIRED, you deleted it before
   num_workers: 2
