@@ -1,15 +1,15 @@
 parent: ./configs/cub/base.yaml
 
 dataset:
-  root_dir: "/content/FET-FGVC/CUB_200_2011/"
-  txt_dir: "./datasets/CUB_200_2011/"
+  root_dir: ~/workspace/dataset/CUB_200_2011/
 
 backbone:
-  pretrain_root: "/content/FET-FGVC/pretrained/"
+  pretrain_root: "/root/workspace/pretrained/vit/"
 
 train:
-  num_workers: 2
+  stage: train # ← REQUIRED
+  num_workers: 2 # (Colab supports max 2 workers)
 
 val:
-  stage: val # ← REQUIRED, you deleted it before
+  stage: val # ← REQUIRED
   num_workers: 2
