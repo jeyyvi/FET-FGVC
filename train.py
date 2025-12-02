@@ -351,13 +351,7 @@ def main():
         else:
             weights_path = os.path.join(args.weights_dir, "last.pth")
         logging.info("Load weights from {}".format(weights_path))
-
-        # --- FIX FOR PYTORCH 2.6 ---
-        import numpy as np
-        torch.serialization.add_safe_globals([np.core.multiarray.scalar])
-        # ---------------------------
-
-        state_dict = torch.load(weights_path, map_location="cpu")
+        state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
         state_dict = {k.replace("_orig_mod.", ""):v for k,v in state_dict.items()}
         filtered_state_dict = {}
         for k, v in state_dict.items():
@@ -453,13 +447,7 @@ def main():
         start_epoch = 0
         best_val = None
         if args.weights_dir and not args.finetune:
-
-            # --- FIX FOR PYTORCH 2.6 ---
-            import numpy as np
-            torch.serialization.add_safe_globals([np.core.multiarray.scalar])
-            # ---------------------------
-
-            state_dict = torch.load(os.path.join(args.weights_dir, "params.pth"), map_location="cpu")
+            state_dict = torch.load(os.path.join(args.weights_dir, "params.pth"), map_location="cpu", weights_only=False)
             start_epoch = state_dict["epoch"]
             [optimizers[idx].load_state_dict(dict) for idx,dict in enumerate(state_dict['optimizer_state_dicts'])]
             best_val = state_dict["best_val"]
