@@ -38,8 +38,8 @@ utils.fix_seed()
 # ============================================================================
 # GOOGLE DRIVE CHECKPOINT FUNCTIONS
 # ============================================================================
-GDRIVE_CHECKPOINT_DIR = '/content/drive/MyDrive/FET-FGVC-checkpoints'
-EVALUATION_DIR = '/content/drive/MyDrive/FET-FGVC-checkpoints/EvaluationResults'
+GDRIVE_CHECKPOINT_DIR = '/content/drive/MyDrive/FET-FGVC-checkpoints2'
+EVALUATION_DIR = '/content/drive/MyDrive/FET-FGVC-checkpoints2/EvaluationResults'
 
 
 def save_checkpoint_to_gdrive(epoch, model, optimizers, best_val, exp_name):
