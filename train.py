@@ -35,15 +35,157 @@ from modules import utils, losses
 
 utils.fix_seed()
 
+# # ============================================================================
+# # GOOGLE DRIVE CHECKPOINT FUNCTIONS
+# # ============================================================================
+# GDRIVE_CHECKPOINT_DIR = '/content/drive/MyDrive/FET-FGVC-checkpoints2'
+# EVALUATION_DIR = '/content/drive/MyDrive/FET-FGVC-checkpoints2/EvaluationResults'
+
+
+# def save_checkpoint_to_gdrive(epoch, model, optimizers, best_val, exp_name):
+#     """Save checkpoint to Google Drive after each epoch"""
+#     try:
+#         # Create experiment directory
+#         exp_dir = os.path.join(GDRIVE_CHECKPOINT_DIR, exp_name)
+#         os.makedirs(exp_dir, exist_ok=True)
+        
+#         # Prepare checkpoint dictionary
+#         checkpoint = {
+#             'epoch': epoch,
+#             'model_state_dict': model.state_dict(),
+#             'best_val': best_val,
+#         }
+        
+#         # Add optimizer states
+#         if isinstance(optimizers, list):
+#             checkpoint['optimizer_state_dicts'] = [opt.state_dict() for opt in optimizers]
+#         else:
+#             checkpoint['optimizer_state_dict'] = optimizers.state_dict()
+        
+#         # Save epoch checkpoint
+#         checkpoint_name = f'checkpoint_epoch_{epoch}.pth'
+#         local_path = checkpoint_name
+#         gdrive_path = os.path.join(exp_dir, checkpoint_name)
+        
+#         # Save locally first
+#         torch.save(checkpoint, local_path)
+#         logging.info(f'💾 Saved local checkpoint: {local_path}')
+        
+#         # Copy to Google Drive
+#         shutil.copy(local_path, gdrive_path)
+#         logging.info(f'☁️  Copied to Google Drive: {gdrive_path}')
+        
+#         # Clean up old local checkpoint
+#         if os.path.exists(local_path):
+#             os.remove(local_path)
+        
+#         return gdrive_path
+        
+#     except Exception as e:
+#         logging.error(f'❌ Error saving checkpoint: {e}')
+#         return None
+
+
+# def save_best_checkpoint_to_gdrive(checkpoint_path, exp_name):
+#     """Save the best checkpoint to Google Drive"""
+#     try:
+#         if checkpoint_path is None:
+#             logging.warning('⚠️  No checkpoint path provided for best model')
+#             return
+            
+#         exp_dir = os.path.join(GDRIVE_CHECKPOINT_DIR, exp_name)
+#         best_path = os.path.join(exp_dir, 'best_checkpoint.pth')
+        
+#         if os.path.exists(checkpoint_path):
+#             shutil.copy(checkpoint_path, best_path)
+#             logging.info(f'⭐ BEST checkpoint saved: {best_path}')
+#         else:
+#             logging.warning(f'⚠️  Checkpoint not found: {checkpoint_path}')
+        
+#     except Exception as e:
+#         logging.error(f'❌ Error saving best checkpoint: {e}')
+
+
+
 # ============================================================================
-# GOOGLE DRIVE CHECKPOINT FUNCTIONS
+# GOOGLE DRIVE CHECKPOINT FUNCTIONS (Keep Only Top 5)
 # ============================================================================
+import os
+import glob
+import shutil
+import logging
+import torch
+
 GDRIVE_CHECKPOINT_DIR = '/content/drive/MyDrive/FET-FGVC-checkpoints2'
 EVALUATION_DIR = '/content/drive/MyDrive/FET-FGVC-checkpoints2/EvaluationResults'
+MAX_CHECKPOINTS = 5  # Keep only top 5 best checkpoints
 
 
-def save_checkpoint_to_gdrive(epoch, model, optimizers, best_val, exp_name):
-    """Save checkpoint to Google Drive after each epoch"""
+def cleanup_old_checkpoints(exp_dir, current_epoch, best_val_history):
+    """
+    Keep only the top 5 best checkpoints based on validation accuracy.
+    
+    Args:
+        exp_dir: Experiment directory path
+        current_epoch: Current epoch number
+        best_val_history: Dict mapping epoch -> validation accuracy
+    """
+    try:
+        # Get all checkpoint files (excluding best_checkpoint.pth)
+        checkpoint_files = glob.glob(os.path.join(exp_dir, 'checkpoint_epoch_*.pth'))
+        
+        if len(checkpoint_files) <= MAX_CHECKPOINTS:
+            return  # No need to cleanup yet
+        
+        # Create list of (epoch, val_acc, filepath) tuples
+        checkpoint_info = []
+        for ckpt_path in checkpoint_files:
+            # Extract epoch number from filename
+            basename = os.path.basename(ckpt_path)
+            try:
+                epoch_num = int(basename.replace('checkpoint_epoch_', '').replace('.pth', ''))
+                val_acc = best_val_history.get(epoch_num, 0.0)
+                checkpoint_info.append((epoch_num, val_acc, ckpt_path))
+            except ValueError:
+                continue
+        
+        # Sort by validation accuracy (descending)
+        checkpoint_info.sort(key=lambda x: x[1], reverse=True)
+        
+        # Keep only top MAX_CHECKPOINTS
+        checkpoints_to_keep = set([info[2] for info in checkpoint_info[:MAX_CHECKPOINTS]])
+        
+        # Delete checkpoints not in top 5
+        deleted_count = 0
+        for _, _, ckpt_path in checkpoint_info[MAX_CHECKPOINTS:]:
+            if os.path.exists(ckpt_path):
+                os.remove(ckpt_path)
+                deleted_count += 1
+                logging.info(f'🗑️  Removed old checkpoint: {os.path.basename(ckpt_path)}')
+        
+        if deleted_count > 0:
+            logging.info(f'✓ Cleanup complete: kept top {MAX_CHECKPOINTS} checkpoints, removed {deleted_count}')
+            
+            # Log which checkpoints are kept
+            kept_epochs = [info[0] for info in checkpoint_info[:MAX_CHECKPOINTS]]
+            logging.info(f'📦 Keeping checkpoints from epochs: {sorted(kept_epochs)}')
+        
+    except Exception as e:
+        logging.error(f'❌ Error during checkpoint cleanup: {e}')
+
+
+def save_checkpoint_to_gdrive(epoch, model, optimizers, best_val, exp_name, best_val_history):
+    """
+    Save checkpoint to Google Drive and maintain only top 5 best checkpoints.
+    
+    Args:
+        epoch: Current epoch number
+        model: Model to save
+        optimizers: List of optimizers
+        best_val: Current best validation accuracy
+        exp_name: Experiment name
+        best_val_history: Dict mapping epoch -> validation accuracy
+    """
     try:
         # Create experiment directory
         exp_dir = os.path.join(GDRIVE_CHECKPOINT_DIR, exp_name)
@@ -54,6 +196,7 @@ def save_checkpoint_to_gdrive(epoch, model, optimizers, best_val, exp_name):
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'best_val': best_val,
+            'val_acc': best_val_history.get(epoch, 0.0),  # Current epoch's val acc
         }
         
         # Add optimizer states
@@ -78,6 +221,9 @@ def save_checkpoint_to_gdrive(epoch, model, optimizers, best_val, exp_name):
         # Clean up old local checkpoint
         if os.path.exists(local_path):
             os.remove(local_path)
+        
+        # Cleanup old checkpoints (keep only top 5)
+        cleanup_old_checkpoints(exp_dir, epoch, best_val_history)
         
         return gdrive_path
         
@@ -104,7 +250,6 @@ def save_best_checkpoint_to_gdrive(checkpoint_path, exp_name):
         
     except Exception as e:
         logging.error(f'❌ Error saving best checkpoint: {e}')
-
 
 # ============================================================================
 # METRICS AND EVALUATION
@@ -297,6 +442,7 @@ def print_top_and_bottom_classes(per_class_results, n=5):
 # ============================================================================
 
 def main():
+
     # prepare model
     load_pretrained = False if (args.from_scratch or args.finetune or args.vis_mode) else True
     if args.img_size == 224:
@@ -471,6 +617,8 @@ def main():
         val_loss_list = []
         val_acc_list = []
         scaler = None
+
+        best_val_history = {}  # Track validation accuracy for each epoch
         
         for epoch in range(start_epoch, args.epochs):
             epoch_start_time = time.time()
@@ -519,6 +667,8 @@ def main():
                 'best_val': best_val,
                 }, params_save_path)
             torch.save(model.state_dict(), os.path.join(model_last_path))
+
+            best_val_history[epoch + 1] = val_acc
             
             # Save checkpoint to Google Drive
             checkpoint_path = save_checkpoint_to_gdrive(
@@ -527,6 +677,7 @@ def main():
                 optimizers=optimizers, 
                 best_val=best_val, 
                 exp_name=args.name
+                best_val_history=best_val_history
             )
             
             if best_val is None or val_acc > best_val:
