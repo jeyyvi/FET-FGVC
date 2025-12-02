@@ -676,7 +676,7 @@ def main():
                 model=model, 
                 optimizers=optimizers, 
                 best_val=best_val, 
-                exp_name=args.name
+                exp_name=args.name,
                 best_val_history=best_val_history
             )
             
