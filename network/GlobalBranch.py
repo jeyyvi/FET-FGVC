@@ -110,7 +110,24 @@ def create_global_branch(arch:str, cfg:dict, only_teacher_model:bool=False):
             global_feature_dim = model.num_features
             if cfg["load_pretrained"]:
                 checkpoint = torch.load(pretrained_path, map_location="cpu")["model"]
-                model.load_state_dict(checkpoint, strict=False)
+                # model.load_state_dict(checkpoint, strict=False)
+                # Filter checkpoint to skip mismatched position-related parameters
+                if checkpoint is not None:
+                    model_state = model.state_dict()
+                    filtered_checkpoint = {}
+                    
+                    for k, v in checkpoint.items():
+                        # Skip parameters that have size mismatches (position embeddings for different resolutions)
+                        if k in model_state:
+                            if v.shape == model_state[k].shape:
+                                filtered_checkpoint[k] = v
+                            else:
+                                logging.warning(f"Skipping {k}: checkpoint shape {v.shape} vs model shape {model_state[k].shape}")
+                        else:
+                            logging.warning(f"Skipping {k}: not found in model")
+                    
+                    model.load_state_dict(filtered_checkpoint, strict=False)
+                    logging.info(f"Loaded {len(filtered_checkpoint)}/{len(checkpoint)} parameters from checkpoint")
             num_patches = model.layers[-1].input_resolution[0] * model.layers[-1].input_resolution[1] # type: ignore
             return model, pruning_loc, global_feature_dim, num_patches, len(depth)
 
