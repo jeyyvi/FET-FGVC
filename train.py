@@ -589,14 +589,71 @@ def main():
                     args.ratio_weight = 10
                 dynamic_criterion = losses.ConvNextDistillDiffPruningLoss(teacher_model, ratio_weight=args.ratio_weight, distill_weight=0.5, keep_ratio=model.keep_rate, swin_token=True)
             
-        ### resume training
+        ### Resume training (FIXED to handle optimizer mismatch)
         start_epoch = 0
         best_val = None
-        if args.weights_dir and not args.finetune:
-            state_dict = torch.load(os.path.join(args.weights_dir, "params.pth"), map_location="cpu", weights_only=False)
-            start_epoch = state_dict["epoch"]
-            [optimizers[idx].load_state_dict(dict) for idx,dict in enumerate(state_dict['optimizer_state_dicts'])]
-            best_val = state_dict["best_val"]
+        
+        # Check for params.pth (contains epoch and optimizer states)
+        params_path = os.path.join(args.weights_dir, "params.pth") if args.weights_dir else None
+        
+        if params_path and os.path.exists(params_path):
+            logging.info(f"🔄 Found params.pth, attempting to resume training...")
+            try:
+                state_dict = torch.load(params_path, map_location="cpu", weights_only=False)
+                start_epoch = state_dict["epoch"]
+                best_val = state_dict.get("best_val", None)
+                
+                # Load optimizer states (handle mismatches gracefully)
+                saved_optimizer_states = state_dict.get('optimizer_state_dicts', [])
+                
+                # Check if number of optimizers matches
+                if isinstance(optimizers, list):
+                    num_current_optimizers = len(optimizers)
+                else:
+                    num_current_optimizers = 1
+                    optimizers = [optimizers]  # Convert to list for uniform handling
+                
+                num_saved_optimizers = len(saved_optimizer_states)
+                
+                if num_current_optimizers == num_saved_optimizers:
+                    # Perfect match - load all optimizer states
+                    for idx, opt_state in enumerate(saved_optimizer_states):
+                        optimizers[idx].load_state_dict(opt_state)
+                        logging.info(f"  ✓ Loaded optimizer {idx} state")
+                    logging.info(f"✓ Successfully resumed from epoch {start_epoch}")
+                    
+                elif num_current_optimizers == 1 and num_saved_optimizers == 2:
+                    # Resuming from 2-optimizer checkpoint to 1-optimizer mode (fine-tuning)
+                    # We can only load the first optimizer's state as a starting point
+                    logging.warning(f"⚠️  Checkpoint has {num_saved_optimizers} optimizers, but model uses {num_current_optimizers}")
+                    logging.warning(f"    Loading only the first optimizer state (backbone)")
+                    optimizers[0].load_state_dict(saved_optimizer_states[0])
+                    logging.info(f"  ✓ Loaded backbone optimizer state")
+                    logging.info(f"✓ Resumed from epoch {start_epoch} (optimizer partially loaded)")
+                    
+                elif num_current_optimizers == 2 and num_saved_optimizers == 1:
+                    # Resuming from 1-optimizer checkpoint to 2-optimizer mode
+                    # This is your current situation!
+                    logging.warning(f"⚠️  Checkpoint has {num_saved_optimizers} optimizer, but model uses {num_current_optimizers}")
+                    logging.warning(f"    Skipping optimizer state loading - optimizers will start fresh")
+                    logging.warning(f"    Only epoch number and best_val will be restored")
+                    logging.info(f"✓ Resumed from epoch {start_epoch} (without optimizer states)")
+                    
+                else:
+                    logging.warning(f"⚠️  Optimizer count mismatch: checkpoint has {num_saved_optimizers}, model has {num_current_optimizers}")
+                    logging.warning(f"    Skipping optimizer state loading")
+                    logging.info(f"✓ Resumed from epoch {start_epoch} (without optimizer states)")
+                
+                if best_val is not None:
+                    logging.info(f"✓ Previous best validation accuracy: {best_val:.4f}")
+                    
+            except Exception as e:
+                logging.warning(f"⚠️  Failed to load resume state: {e}")
+                logging.info("Starting fresh training instead...")
+                start_epoch = 0
+                best_val = None
+        else:
+            logging.info("No params.pth found, starting from epoch 0")
 
         # Data loading code
         train_dataset = BatchDataset(cfg.dataset.root_dir, cfg.train.stage, cfg.dataset.txt_dir, transform=transform1)
